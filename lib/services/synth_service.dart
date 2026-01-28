@@ -161,6 +161,87 @@ class SynthService {
   /// Check if currently playing
   bool get isCurrentlyPlaying => _player?.playing ?? false;
 
+  // Live monitoring mode
+  bool _isMonitoring = false;
+  Timer? _monitorTimer;
+  AudioPlayer? _monitorPlayer;
+
+  bool get isMonitoring => _isMonitoring;
+
+  /// Start live monitoring - plays incoming MIDI through speaker
+  Future<void> startMonitoring() async {
+    if (!_isLoaded || _synth == null || _isMonitoring) return;
+
+    print('SynthService: Starting live monitoring');
+    _isMonitoring = true;
+    _monitorPlayer = AudioPlayer();
+
+    // Reset synth
+    _synth!.noteOffAll(immediate: true);
+    _synth!.reset();
+
+    // Start continuous rendering loop
+    _continuousRender();
+  }
+
+  /// Stop live monitoring
+  void stopMonitoring() {
+    print('SynthService: Stopping live monitoring');
+    _isMonitoring = false;
+    _monitorTimer?.cancel();
+    _monitorTimer = null;
+    _monitorPlayer?.stop();
+    _monitorPlayer?.dispose();
+    _monitorPlayer = null;
+    _synth?.noteOffAll(immediate: true);
+  }
+
+  /// Continuous render loop for live monitoring
+  Future<void> _continuousRender() async {
+    if (!_isMonitoring || _synth == null || _monitorPlayer == null) return;
+
+    // Render a buffer of audio
+    const chunkSamples = 4096;
+    final chunk = ArrayInt16.zeros(numShorts: chunkSamples * 2);
+    _synth!.renderInterleavedInt16(chunk);
+
+    // Convert to bytes
+    final pcmBytes = Uint8List(chunkSamples * 4);
+    final byteData = ByteData.view(pcmBytes.buffer);
+    for (int i = 0; i < chunkSamples * 2; i++) {
+      byteData.setInt16(i * 2, chunk[i], Endian.little);
+    }
+
+    // Create WAV and play
+    final wavBytes = _createWavFile(pcmBytes, sampleRate, 2, 16);
+
+    try {
+      final audioSource = _WavAudioSource(wavBytes);
+      await _monitorPlayer!.setAudioSource(audioSource);
+      _monitorPlayer!.play();
+    } catch (e) {
+      // Ignore errors during continuous playback
+    }
+
+    // Schedule next render (buffer duration minus a bit for overlap)
+    final bufferDurationMs = (chunkSamples * 1000) ~/ sampleRate;
+    _monitorTimer = Timer(Duration(milliseconds: bufferDurationMs - 20), () {
+      _continuousRender();
+    });
+  }
+
+  /// Handle incoming MIDI note for live monitoring
+  void monitorNoteOn(int note, int velocity) {
+    if (!_isMonitoring || _synth == null) return;
+    _synth!.noteOn(channel: 0, key: note, velocity: velocity);
+  }
+
+  /// Handle incoming MIDI note off for live monitoring
+  void monitorNoteOff(int note) {
+    if (!_isMonitoring || _synth == null) return;
+    _synth!.noteOff(channel: 0, key: note);
+  }
+
   /// Create a WAV file from raw PCM data
   Uint8List _createWavFile(Uint8List pcmData, int sampleRate, int channels, int bitsPerSample) {
     final byteRate = sampleRate * channels * bitsPerSample ~/ 8;

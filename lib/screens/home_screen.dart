@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import '../providers/app_state.dart';
 import '../widgets/live_midi_display.dart';
+import '../models/melody.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,13 +16,51 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<MidiDevice> _devices = [];
   bool _scanning = false;
+  bool _monitorEnabled = false;
+  StreamSubscription? _midiEventSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scanDevices();
+      _setupMidiMonitoring();
     });
+  }
+
+  void _setupMidiMonitoring() {
+    final appState = context.read<AppState>();
+    _midiEventSubscription = appState.midiService.midiEventStream.listen((event) {
+      if (_monitorEnabled && appState.synthService.isLoaded) {
+        if (event.isNoteOn) {
+          appState.synthService.monitorNoteOn(event.data1, event.data2);
+        } else if (event.isNoteOff) {
+          appState.synthService.monitorNoteOff(event.data1);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _midiEventSubscription?.cancel();
+    // Stop monitoring when leaving screen
+    final appState = context.read<AppState>();
+    if (_monitorEnabled) {
+      appState.synthService.stopMonitoring();
+    }
+    super.dispose();
+  }
+
+  void _toggleMonitor() async {
+    final appState = context.read<AppState>();
+    if (_monitorEnabled) {
+      appState.synthService.stopMonitoring();
+      setState(() => _monitorEnabled = false);
+    } else {
+      await appState.synthService.startMonitoring();
+      setState(() => _monitorEnabled = true);
+    }
   }
 
   Future<void> _scanDevices() async {
@@ -151,6 +191,42 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
+          // Monitor toggle when connected
+          if (appState.isConnected) ...[
+            const SizedBox(height: 16),
+            const Divider(color: Colors.white10),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.volume_up,
+                  color: _monitorEnabled ? const Color(0xFF4fc3f7) : Colors.white54,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Speaker Monitor',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                      Text(
+                        _monitorEnabled ? 'Playing through iPhone' : 'Hear your keyboard through iPhone speaker',
+                        style: const TextStyle(color: Colors.white38, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _monitorEnabled,
+                  onChanged: (value) => _toggleMonitor(),
+                  activeColor: const Color(0xFF4fc3f7),
+                ),
+              ],
+            ),
+          ],
           if (!appState.isConnected && _devices.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Divider(color: Colors.white10),
