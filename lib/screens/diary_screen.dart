@@ -20,17 +20,25 @@ class _DiaryScreenState extends State<DiaryScreen> {
   @override
   void initState() {
     super.initState();
-    // Select today by default
     _selectedDate = DateTime.now();
-    _loadMelodiesForDate(_selectedDate!);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadMelodiesForDate(_selectedDate!);
+    });
   }
 
   Future<void> _loadMelodiesForDate(DateTime date) async {
-    final appState = context.read<AppState>();
-    final melodies = await appState.getMelodiesForDate(date);
-    setState(() {
-      _selectedDayMelodies = melodies;
-    });
+    if (!mounted) return;
+    try {
+      final appState = context.read<AppState>();
+      final melodies = await appState.getMelodiesForDate(date);
+      if (mounted) {
+        setState(() {
+          _selectedDayMelodies = melodies;
+        });
+      }
+    } catch (e) {
+      print('Error loading melodies: $e');
+    }
   }
 
   @override

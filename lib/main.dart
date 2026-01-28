@@ -22,6 +22,12 @@ void main() {
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
+  // Add error handling
+  FlutterError.onError = (details) {
+    print('Flutter Error: ${details.exception}');
+    print('Stack: ${details.stack}');
+  };
+
   runApp(const MidicordApp());
 }
 
@@ -44,7 +50,6 @@ class MidicordApp extends StatelessWidget {
             secondary: Color(0xFFe040fb),
             surface: Color(0xFF1a1a2e),
           ),
-          fontFamily: 'Inter',
           useMaterial3: true,
         ),
         home: const MainNavigation(),
@@ -63,80 +68,29 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
-  final _screens = const [
-    HomeScreen(),
-    DiaryScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF1a1a2e),
-          border: Border(
-            top: BorderSide(color: Colors.white10, width: 1),
+      backgroundColor: const Color(0xFF0f0f1a),
+      body: _currentIndex == 0
+          ? const HomeScreen()
+          : const DiaryScreen(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        backgroundColor: const Color(0xFF1a1a2e),
+        selectedItemColor: const Color(0xFF4fc3f7),
+        unselectedItemColor: Colors.white38,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.radio_button_checked),
+            label: 'Record',
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  icon: Icons.radio_button_checked,
-                  label: 'Record',
-                  index: 0,
-                ),
-                _buildNavItem(
-                  icon: Icons.calendar_month,
-                  label: 'Diary',
-                  index: 1,
-                ),
-              ],
-            ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month),
+            label: 'Diary',
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-  }) {
-    final isSelected = _currentIndex == index;
-
-    return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? const Color(0xFF4fc3f7) : Colors.white38,
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? const Color(0xFF4fc3f7) : Colors.white38,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

@@ -18,17 +18,30 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _scanDevices();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scanDevices();
+    });
   }
 
   Future<void> _scanDevices() async {
+    if (!mounted) return;
     setState(() => _scanning = true);
-    final appState = context.read<AppState>();
-    final devices = await appState.midiService.getDevices();
-    setState(() {
-      _devices = devices;
-      _scanning = false;
-    });
+    try {
+      final appState = context.read<AppState>();
+      final devices = await appState.midiService.getDevices();
+      if (mounted) {
+        setState(() {
+          // Filter out network sessions - only show real MIDI devices
+          _devices = devices.where((d) => !d.name.contains('Network Session')).toList();
+          _scanning = false;
+        });
+      }
+    } catch (e) {
+      print('Error scanning devices: $e');
+      if (mounted) {
+        setState(() => _scanning = false);
+      }
+    }
   }
 
   @override
@@ -62,39 +75,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 32),
-
-                  // Connection status
                   _buildConnectionCard(appState),
-                  const SizedBox(height: 24),
-
-                  // Recording status
-                  if (appState.isConnected) ...[
-                    _buildRecordingCard(appState),
-                    const SizedBox(height: 24),
-
-                    // Live keyboard display
-                    const Text(
-                      'Live Input',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1a1a2e),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      child: LiveMidiDisplay(midiService: appState.midiService),
-                    ),
-                  ],
-
                   const Spacer(),
-
-                  // Quick stats
                   _buildQuickStats(appState),
                 ],
               ),
@@ -179,13 +161,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: Text(
                     device.name,
                     style: const TextStyle(color: Colors.white),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: TextButton(
-                    onPressed: () async {
-                      await appState.midiService.connect(device);
-                      setState(() {});
-                    },
-                    child: const Text('Connect'),
+                  trailing: SizedBox(
+                    width: 80,
+                    child: TextButton(
+                      onPressed: () async {
+                        print('Connecting to: ${device.name} (${device.id})');
+                        await appState.midiService.connect(device);
+                        setState(() {});
+                      },
+                      child: const Text('Connect'),
+                    ),
                   ),
                 )),
           ],
@@ -314,19 +301,21 @@ class _HomeScreenState extends State<HomeScreen> {
   int _calculateStreak(AppState appState) {
     int streak = 0;
     var date = DateTime.now();
+    int daysChecked = 0;
+    const maxDaysToCheck = 365;
 
-    while (true) {
+    while (daysChecked < maxDaysToCheck) {
       final dayKey = DateTime(date.year, date.month, date.day);
       if (appState.practiceByDay.containsKey(dayKey)) {
         streak++;
         date = date.subtract(const Duration(days: 1));
-      } else if (streak == 0) {
-        // Check if we haven't played today yet
+      } else if (streak == 0 && daysChecked < 1) {
+        // Only skip one day if we haven't played today yet
         date = date.subtract(const Duration(days: 1));
-        continue;
       } else {
         break;
       }
+      daysChecked++;
     }
 
     return streak;

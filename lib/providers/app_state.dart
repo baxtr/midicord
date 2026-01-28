@@ -3,11 +3,13 @@ import '../models/melody.dart';
 import '../services/midi_service.dart';
 import '../services/storage_service.dart';
 import '../services/ai_service.dart';
+import '../services/synth_service.dart';
 
 class AppState extends ChangeNotifier {
   final MidiService midiService = MidiService();
   final StorageService storageService = StorageService();
   final AiService aiService = AiService();
+  final SynthService synthService = SynthService();
 
   List<Melody> _melodies = [];
   Map<DateTime, int> _practiceByDay = {};
@@ -32,6 +34,15 @@ class AppState extends ChangeNotifier {
       _isRecording = recording;
       notifyListeners();
     });
+
+    // Listen for completed recordings and auto-save them
+    midiService.recordingCompleteStream.listen((melody) async {
+      print('Auto-saving recording with ${melody.events.length} events');
+      await saveMelody(melody);
+    });
+
+    // Initialize synth for speaker playback (don't await to avoid blocking)
+    synthService.init();
 
     // Load melodies
     await loadMelodies();

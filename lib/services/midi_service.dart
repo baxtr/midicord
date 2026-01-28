@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
 import '../models/melody.dart';
 
@@ -17,14 +18,41 @@ class MidiService {
   final _connectionController = StreamController<MidiDevice?>.broadcast();
   final _midiEventController = StreamController<MidiEvent>.broadcast();
   final _recordingStateController = StreamController<bool>.broadcast();
+  final _recordingCompleteController = StreamController<Melody>.broadcast();
 
   Stream<MidiDevice?> get connectionStream => _connectionController.stream;
   Stream<MidiEvent> get midiEventStream => _midiEventController.stream;
   Stream<bool> get recordingStateStream => _recordingStateController.stream;
+  Stream<Melody> get recordingCompleteStream => _recordingCompleteController.stream;
 
   MidiDevice? get connectedDevice => _connectedDevice;
   bool get isRecording => _isRecording;
   bool get isConnected => _connectedDevice != null;
+
+  /// Send MIDI data to the connected device
+  void sendMidiData(int type, int channel, int data1, int data2) {
+    if (_connectedDevice == null) return;
+
+    final statusByte = type | channel;
+    final data = Uint8List.fromList([statusByte, data1, data2]);
+    _midiCommand.sendData(data, deviceId: _connectedDevice!.id);
+  }
+
+  /// Send a note on event
+  void sendNoteOn(int note, int velocity, {int channel = 0}) {
+    sendMidiData(0x90, channel, note, velocity);
+  }
+
+  /// Send a note off event
+  void sendNoteOff(int note, {int channel = 0}) {
+    sendMidiData(0x80, channel, note, 0);
+  }
+
+  /// Send all notes off (panic)
+  void sendAllNotesOff({int channel = 0}) {
+    // CC 123 = All Notes Off
+    sendMidiData(0xB0, channel, 123, 0);
+  }
 
   MidiService() {
     _init();
@@ -57,6 +85,9 @@ class MidiService {
       _midiSubscription?.cancel();
       _midiSubscription = _midiCommand.onMidiDataReceived?.listen(_handleMidiData);
 
+      // Enable auto-recording
+      enableAutoRecord();
+
       return true;
     } catch (e) {
       print('Failed to connect to MIDI device: $e');
@@ -78,11 +109,14 @@ class MidiService {
 
   void _handleMidiData(MidiPacket packet) {
     final data = packet.data;
+    print('MIDI data received: $data');
     if (data.isEmpty) return;
 
     final status = data[0];
     final type = status & 0xF0;
     final channel = status & 0x0F;
+
+    print('MIDI type: $type, channel: $channel');
 
     // Only process note on/off and control change
     if (type != 0x90 && type != 0x80 && type != 0xB0) return;
@@ -98,10 +132,12 @@ class MidiService {
       data2: data[2],
     );
 
+    print('MIDI event created: note=${event.data1}, velocity=${event.data2}, isNoteOn=${event.isNoteOn}');
     _midiEventController.add(event);
 
     if (_isRecording) {
       _recordedEvents.add(event);
+      print('Event added to recording. Total events: ${_recordedEvents.length}');
     }
   }
 
@@ -143,18 +179,32 @@ class MidiService {
 
   /// Auto-record: start on first note, stop after silence
   Timer? _silenceTimer;
+  StreamSubscription<MidiEvent>? _autoRecordSubscription;
   static const _silenceThreshold = Duration(seconds: 3);
+  bool _autoRecordEnabled = false;
 
   void enableAutoRecord() {
-    _midiEventController.stream.listen((event) {
+    if (_autoRecordEnabled) return; // Already enabled
+    _autoRecordEnabled = true;
+    print('Auto-record enabled');
+
+    _autoRecordSubscription?.cancel();
+    _autoRecordSubscription = _midiEventController.stream.listen((event) {
+      print('Auto-record got event: isNoteOn=${event.isNoteOn}');
       if (event.isNoteOn) {
         if (!_isRecording) {
+          print('Starting recording from auto-record');
           startRecording();
         }
         // Reset silence timer
         _silenceTimer?.cancel();
         _silenceTimer = Timer(_silenceThreshold, () {
-          stopRecording();
+          print('Silence timer triggered, stopping recording');
+          final melody = stopRecording();
+          if (melody != null) {
+            print('Emitting completed recording with ${melody.events.length} events');
+            _recordingCompleteController.add(melody);
+          }
         });
       }
     });
@@ -163,9 +213,11 @@ class MidiService {
   void dispose() {
     _midiSubscription?.cancel();
     _setupSubscription?.cancel();
+    _autoRecordSubscription?.cancel();
     _silenceTimer?.cancel();
     _connectionController.close();
     _midiEventController.close();
     _recordingStateController.close();
+    _recordingCompleteController.close();
   }
 }

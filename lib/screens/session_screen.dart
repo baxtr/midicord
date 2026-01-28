@@ -19,10 +19,12 @@ class _SessionScreenState extends State<SessionScreen> {
   late Melody _melody;
   bool _isPlaying = false;
   int _playheadPosition = 0;
+  int _lastPlayheadPosition = 0;
   Timer? _playbackTimer;
   double _playbackSpeed = 1.0;
   (int, int)? _loopRange;
   bool _isLooping = false;
+  bool _useSpeaker = false; // false = MIDI output, true = speaker
 
   final TextEditingController _notesController = TextEditingController();
 
@@ -48,41 +50,94 @@ class _SessionScreenState extends State<SessionScreen> {
     }
   }
 
-  void _play() {
-    setState(() => _isPlaying = true);
+  void _play() async {
+    final appState = context.read<AppState>();
 
-    const tickMs = 16; // ~60fps
-    _playbackTimer = Timer.periodic(
-      Duration(milliseconds: tickMs),
-      (timer) {
-        setState(() {
-          _playheadPosition += (tickMs * _playbackSpeed).round();
+    if (_useSpeaker) {
+      // For speaker playback, pre-render the entire melody
+      setState(() => _isPlaying = true);
 
-          // Handle looping
-          if (_isLooping && _loopRange != null) {
-            if (_playheadPosition >= _loopRange!.$2) {
-              _playheadPosition = _loopRange!.$1;
+      // Pre-render and start playback
+      await appState.synthService.playMelody(_melody.events, _melody.durationMs);
+
+      // Start visual playhead timer
+      const tickMs = 16;
+      _playbackTimer = Timer.periodic(
+        Duration(milliseconds: tickMs),
+        (timer) {
+          setState(() {
+            _playheadPosition += (tickMs * _playbackSpeed).round();
+
+            if (_playheadPosition >= _melody.durationMs) {
+              _pause();
+              _playheadPosition = 0;
             }
-          } else if (_playheadPosition >= _melody.durationMs) {
-            _pause();
-            _playheadPosition = 0;
-          }
-        });
+          });
+        },
+      );
+    } else {
+      // For MIDI playback, send events in real-time
+      setState(() => _isPlaying = true);
+      _lastPlayheadPosition = _playheadPosition;
 
-        // TODO: Send MIDI events at correct timestamps
-        // This would use the midiService to send note-on/off events
-      },
-    );
+      const tickMs = 16; // ~60fps
+      _playbackTimer = Timer.periodic(
+        Duration(milliseconds: tickMs),
+        (timer) {
+          final prevPosition = _lastPlayheadPosition;
+
+          setState(() {
+            _playheadPosition += (tickMs * _playbackSpeed).round();
+
+            // Handle looping
+            if (_isLooping && _loopRange != null) {
+              if (_playheadPosition >= _loopRange!.$2) {
+                appState.midiService.sendAllNotesOff();
+                _playheadPosition = _loopRange!.$1;
+              }
+            } else if (_playheadPosition >= _melody.durationMs) {
+              _pause();
+              _playheadPosition = 0;
+              return;
+            }
+          });
+
+          // Send MIDI events that fall between previous and current position
+          for (final event in _melody.events) {
+            if (event.timestamp > prevPosition && event.timestamp <= _playheadPosition) {
+              appState.midiService.sendMidiData(
+                event.type,
+                event.channel,
+                event.data1,
+                event.data2,
+              );
+            }
+          }
+
+          _lastPlayheadPosition = _playheadPosition;
+        },
+      );
+    }
   }
 
   void _pause() {
     _playbackTimer?.cancel();
+    // Stop playback
+    final appState = context.read<AppState>();
+    if (_useSpeaker) {
+      appState.synthService.stopMelody();
+    } else {
+      appState.midiService.sendAllNotesOff();
+    }
     setState(() => _isPlaying = false);
   }
 
   void _stop() {
     _pause();
-    setState(() => _playheadPosition = 0);
+    setState(() {
+      _playheadPosition = 0;
+      _lastPlayheadPosition = 0;
+    });
   }
 
   void _setLoopRange() {
@@ -208,7 +263,14 @@ class _SessionScreenState extends State<SessionScreen> {
                       min: 0,
                       max: _melody.durationMs.toDouble(),
                       onChanged: (value) {
-                        setState(() => _playheadPosition = value.round());
+                        // Pause playback when seeking
+                        if (_isPlaying) {
+                          _pause();
+                        }
+                        setState(() {
+                          _playheadPosition = value.round();
+                          _lastPlayheadPosition = _playheadPosition;
+                        });
                       },
                       activeColor: const Color(0xFF4fc3f7),
                       inactiveColor: Colors.white24,
@@ -292,8 +354,18 @@ class _SessionScreenState extends State<SessionScreen> {
                   ),
                   const SizedBox(width: 16),
 
-                  // Placeholder for symmetry
-                  const SizedBox(width: 48),
+                  // Speaker/MIDI toggle
+                  IconButton(
+                    icon: Icon(
+                      _useSpeaker ? Icons.volume_up : Icons.piano,
+                      color: _useSpeaker ? const Color(0xFF4fc3f7) : Colors.white,
+                    ),
+                    onPressed: () {
+                      setState(() => _useSpeaker = !_useSpeaker);
+                    },
+                    iconSize: 28,
+                    tooltip: _useSpeaker ? 'Speaker (tap for MIDI)' : 'MIDI (tap for Speaker)',
+                  ),
                 ],
               ),
             ),
