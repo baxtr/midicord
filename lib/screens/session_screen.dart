@@ -1,0 +1,403 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/melody.dart';
+import '../providers/app_state.dart';
+import '../widgets/piano_roll.dart';
+import 'ai_expand_screen.dart';
+
+class SessionScreen extends StatefulWidget {
+  final Melody melody;
+
+  const SessionScreen({super.key, required this.melody});
+
+  @override
+  State<SessionScreen> createState() => _SessionScreenState();
+}
+
+class _SessionScreenState extends State<SessionScreen> {
+  late Melody _melody;
+  bool _isPlaying = false;
+  int _playheadPosition = 0;
+  Timer? _playbackTimer;
+  double _playbackSpeed = 1.0;
+  (int, int)? _loopRange;
+  bool _isLooping = false;
+
+  final TextEditingController _notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _melody = widget.melody;
+    _notesController.text = _melody.notes ?? '';
+  }
+
+  @override
+  void dispose() {
+    _playbackTimer?.cancel();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayback() {
+    if (_isPlaying) {
+      _pause();
+    } else {
+      _play();
+    }
+  }
+
+  void _play() {
+    setState(() => _isPlaying = true);
+
+    const tickMs = 16; // ~60fps
+    _playbackTimer = Timer.periodic(
+      Duration(milliseconds: tickMs),
+      (timer) {
+        setState(() {
+          _playheadPosition += (tickMs * _playbackSpeed).round();
+
+          // Handle looping
+          if (_isLooping && _loopRange != null) {
+            if (_playheadPosition >= _loopRange!.$2) {
+              _playheadPosition = _loopRange!.$1;
+            }
+          } else if (_playheadPosition >= _melody.durationMs) {
+            _pause();
+            _playheadPosition = 0;
+          }
+        });
+
+        // TODO: Send MIDI events at correct timestamps
+        // This would use the midiService to send note-on/off events
+      },
+    );
+  }
+
+  void _pause() {
+    _playbackTimer?.cancel();
+    setState(() => _isPlaying = false);
+  }
+
+  void _stop() {
+    _pause();
+    setState(() => _playheadPosition = 0);
+  }
+
+  void _setLoopRange() {
+    // TODO: Implement visual selection
+    // For now, just toggle looping with current quarter
+    if (_loopRange == null) {
+      final quarter = _melody.durationMs ~/ 4;
+      final currentQuarter = _playheadPosition ~/ quarter;
+      setState(() {
+        _loopRange = (currentQuarter * quarter, (currentQuarter + 1) * quarter);
+        _isLooping = true;
+      });
+    } else {
+      setState(() {
+        _loopRange = null;
+        _isLooping = false;
+      });
+    }
+  }
+
+  Future<void> _saveNotes() async {
+    final appState = context.read<AppState>();
+    final updatedMelody = _melody.copyWith(notes: _notesController.text);
+    await appState.updateMelody(updatedMelody);
+    setState(() => _melody = updatedMelody);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Notes saved')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0f0f1a),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome, color: Color(0xFFe040fb)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AiExpandScreen(melody: _melody),
+                ),
+              );
+            },
+            tooltip: 'AI Expand',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.white54),
+            onPressed: _confirmDelete,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _formatTime(_melody.createdAt),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_melody.events.where((e) => e.isNoteOn).length} notes \u2022 ${_melody.durationFormatted}',
+                    style: const TextStyle(color: Colors.white54, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Piano roll
+            Expanded(
+              flex: 3,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: PianoRoll(
+                  events: _melody.events,
+                  playheadPosition: _playheadPosition,
+                  selectedRange: _loopRange,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Playback position
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Text(
+                    _formatDuration(_playheadPosition),
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: _playheadPosition.toDouble(),
+                      min: 0,
+                      max: _melody.durationMs.toDouble(),
+                      onChanged: (value) {
+                        setState(() => _playheadPosition = value.round());
+                      },
+                      activeColor: const Color(0xFF4fc3f7),
+                      inactiveColor: Colors.white24,
+                    ),
+                  ),
+                  Text(
+                    _melody.durationFormatted,
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+
+            // Playback controls
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Speed control
+                  PopupMenuButton<double>(
+                    onSelected: (speed) {
+                      setState(() => _playbackSpeed = speed);
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 0.5, child: Text('0.5x')),
+                      const PopupMenuItem(value: 0.75, child: Text('0.75x')),
+                      const PopupMenuItem(value: 0.9, child: Text('0.9x')),
+                      const PopupMenuItem(value: 1.0, child: Text('1.0x')),
+                      const PopupMenuItem(value: 1.1, child: Text('1.1x')),
+                      const PopupMenuItem(value: 1.25, child: Text('1.25x')),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1a1a2e),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${_playbackSpeed}x',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Stop
+                  IconButton(
+                    icon: const Icon(Icons.stop, color: Colors.white),
+                    onPressed: _stop,
+                    iconSize: 32,
+                  ),
+
+                  // Play/Pause
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF4fc3f7),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        _isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.black,
+                      ),
+                      onPressed: _togglePlayback,
+                      iconSize: 40,
+                    ),
+                  ),
+
+                  // Loop toggle
+                  IconButton(
+                    icon: Icon(
+                      Icons.repeat,
+                      color: _isLooping ? const Color(0xFF4fc3f7) : Colors.white,
+                    ),
+                    onPressed: _setLoopRange,
+                    iconSize: 32,
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Placeholder for symmetry
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Notes section
+            Expanded(
+              flex: 2,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1a1a2e),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Notes',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _saveNotes,
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _notesController,
+                        maxLines: null,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          hintText: 'Add notes about this session...',
+                          hintStyle: TextStyle(color: Colors.white24),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour > 12 ? dt.hour - 12 : dt.hour;
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '$hour:$minute $ampm';
+  }
+
+  String _formatDuration(int ms) {
+    final minutes = ms ~/ 60000;
+    final seconds = (ms % 60000) ~/ 1000;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  void _confirmDelete() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1a1a2e),
+        title: const Text(
+          'Delete Recording?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'This cannot be undone.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final appState = context.read<AppState>();
+              if (_melody.id != null) {
+                await appState.deleteMelody(_melody.id!);
+              }
+              if (mounted) {
+                Navigator.pop(context); // Dialog
+                Navigator.pop(context); // Screen
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+}
