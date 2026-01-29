@@ -180,8 +180,14 @@ class MidiService {
   /// Auto-record: start on first note, stop after silence
   Timer? _silenceTimer;
   StreamSubscription<MidiEvent>? _autoRecordSubscription;
-  static const _silenceThreshold = Duration(seconds: 3);
+  Duration _silenceThreshold = const Duration(seconds: 3);
   bool _autoRecordEnabled = false;
+
+  void setSilenceThreshold(int seconds) {
+    _silenceThreshold = Duration(seconds: seconds);
+  }
+
+  int get silenceThresholdSeconds => _silenceThreshold.inSeconds;
 
   void enableAutoRecord() {
     if (_autoRecordEnabled) return; // Already enabled

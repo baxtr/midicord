@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/melody.dart';
 import '../providers/app_state.dart';
 import '../widgets/piano_roll.dart';
 import '../widgets/falling_notes_view.dart';
+import '../services/midi_export_service.dart';
 import 'ai_expand_screen.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -216,6 +220,11 @@ class _SessionScreenState extends State<SessionScreen> {
               );
             },
             tooltip: 'AI Expand',
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share, color: Colors.white),
+            onPressed: _exportMidi,
+            tooltip: 'Export MIDI',
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.white54),
@@ -557,5 +566,37 @@ class _SessionScreenState extends State<SessionScreen> {
         ],
       ),
     );
+  }
+
+  static const _shareChannel = MethodChannel('com.midicord/share');
+
+  Future<void> _exportMidi() async {
+    try {
+      // Generate MIDI file data
+      final midiData = MidiExportService.exportToMidi(_melody);
+      final filename = MidiExportService.generateFilename(_melody);
+
+      // Write to documents directory
+      final docsDir = await getApplicationDocumentsDirectory();
+      final filePath = '${docsDir.path}/$filename';
+      final file = File(filePath);
+      await file.writeAsBytes(midiData);
+
+      // Verify file was written
+      if (!await file.exists()) {
+        throw Exception('Failed to write MIDI file');
+      }
+
+      // Use native iOS share sheet
+      await _shareChannel.invokeMethod('shareFile', {'path': filePath});
+
+    } catch (e) {
+      print('Export error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
   }
 }

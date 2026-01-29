@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/melody.dart';
 import '../services/midi_service.dart';
 import '../services/storage_service.dart';
@@ -43,6 +44,9 @@ class AppState extends ChangeNotifier {
 
     // Initialize synth for speaker playback (don't await to avoid blocking)
     synthService.init();
+
+    // Load settings
+    await _loadSilenceThreshold();
 
     // Load melodies
     await loadMelodies();
@@ -100,6 +104,21 @@ class AppState extends ChangeNotifier {
 
   Future<void> setApiKey(String key) async {
     await aiService.setApiKey(key);
+  }
+
+  int get silenceThreshold => midiService.silenceThresholdSeconds;
+
+  Future<void> setSilenceThreshold(int seconds) async {
+    midiService.setSilenceThreshold(seconds);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('silence_threshold', seconds);
+    notifyListeners();
+  }
+
+  Future<void> _loadSilenceThreshold() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seconds = prefs.getInt('silence_threshold') ?? 3;
+    midiService.setSilenceThreshold(seconds);
   }
 
   @override

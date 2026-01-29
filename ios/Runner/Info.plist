@@ -51,5 +51,11 @@
 	<string>Midicord uses Bluetooth to connect to MIDI devices</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Midicord uses the local network to discover MIDI devices</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
 </dict>
 </plist>

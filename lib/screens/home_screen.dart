@@ -434,6 +434,18 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () => _showApiKeyDialog(context, appState),
             ),
             ListTile(
+              leading: const Icon(Icons.timer, color: Colors.white54),
+              title: const Text(
+                'Auto-save delay',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: Text(
+                '${appState.silenceThreshold} seconds of silence',
+                style: const TextStyle(color: Colors.white38),
+              ),
+              onTap: () => _showSilenceThresholdDialog(context, appState),
+            ),
+            ListTile(
               leading: const Icon(Icons.info_outline, color: Colors.white54),
               title: const Text(
                 'About Midicord',
@@ -485,6 +497,48 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
             child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSilenceThresholdDialog(BuildContext context, AppState appState) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1a1a2e),
+        title: const Text('Auto-save delay', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Save recording after silence of:',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 16),
+            ...[3, 5, 10].map((seconds) => RadioListTile<int>(
+              title: Text(
+                '$seconds seconds',
+                style: const TextStyle(color: Colors.white),
+              ),
+              value: seconds,
+              groupValue: appState.silenceThreshold,
+              activeColor: const Color(0xFF4fc3f7),
+              onChanged: (value) async {
+                if (value != null) {
+                  await appState.setSilenceThreshold(value);
+                  Navigator.pop(context);
+                  Navigator.pop(context); // Close settings too
+                }
+              },
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
         ],
       ),
