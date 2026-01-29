@@ -6,9 +6,9 @@ plugins {
 }
 
 android {
-    namespace = "com.midicord.melodory"
+    namespace = "com.example.melodory"
     compileSdk = flutter.compileSdkVersion
-    // ndkVersion = flutter.ndkVersion  // Commented out to avoid NDK issues
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -20,8 +20,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.midicord.melodory"
-        minSdk = flutter.minSdkVersion  // Required for MIDI support
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId = "com.example.melodory"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

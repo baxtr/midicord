@@ -1,4 +1,4 @@
-package com.midicord.melodory
+package com.example.melodory
 
 import android.content.Intent
 import android.graphics.Bitmap
