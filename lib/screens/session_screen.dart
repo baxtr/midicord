@@ -10,6 +10,7 @@ import '../providers/app_state.dart';
 import '../widgets/piano_roll.dart';
 import '../widgets/falling_notes_view.dart';
 import '../services/midi_export_service.dart';
+import '../services/video_export_service.dart';
 import 'ai_expand_screen.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _SessionScreenState extends State<SessionScreen> {
   bool _isLooping = false;
   bool _useSpeaker = false; // false = MIDI output, true = speaker
   bool _useFallingNotes = false; // false = piano roll, true = falling notes
+  bool _isExportingVideo = false;
 
   final TextEditingController _notesController = TextEditingController();
 
@@ -221,10 +223,39 @@ class _SessionScreenState extends State<SessionScreen> {
             },
             tooltip: 'AI Expand',
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.ios_share, color: Colors.white),
-            onPressed: _exportMidi,
-            tooltip: 'Export MIDI',
+            tooltip: 'Export',
+            color: const Color(0xFF1a1a2e),
+            onSelected: (value) {
+              if (value == 'midi') {
+                _exportMidi();
+              } else if (value == 'video') {
+                _exportVideo();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'midi',
+                child: Row(
+                  children: [
+                    Icon(Icons.music_note, color: Colors.white70, size: 20),
+                    SizedBox(width: 12),
+                    Text('Export MIDI', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'video',
+                child: Row(
+                  children: [
+                    Icon(Icons.videocam, color: Colors.white70, size: 20),
+                    SizedBox(width: 12),
+                    Text('Export Video', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.white54),
@@ -569,6 +600,92 @@ class _SessionScreenState extends State<SessionScreen> {
   }
 
   static const _shareChannel = MethodChannel('com.midicord/share');
+
+  Future<void> _exportVideo() async {
+    if (_isExportingVideo) return;
+
+    setState(() => _isExportingVideo = true);
+
+    // Use a ValueNotifier for progress updates
+    final progressNotifier = ValueNotifier<double>(0.0);
+
+    // Show progress dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1a1a2e),
+        title: const Text('Exporting Video', style: TextStyle(color: Colors.white)),
+        content: ValueListenableBuilder<double>(
+          valueListenable: progressNotifier,
+          builder: (context, progress, child) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4fc3f7)),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '${(progress * 100).round()}%',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  progress < 0.8
+                      ? 'Rendering frames...'
+                      : progress < 0.9
+                          ? 'Processing audio...'
+                          : 'Creating video...',
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+
+    try {
+      // Use screen dimensions for video (portrait)
+      final videoPath = await VideoExportService.exportVideo(
+        melody: _melody,
+        width: 720,
+        height: 1280,
+        fps: 30,
+        onProgress: (progress) {
+          progressNotifier.value = progress;
+        },
+      );
+
+      // Close progress dialog
+      if (mounted) Navigator.of(context).pop();
+
+      setState(() => _isExportingVideo = false);
+      progressNotifier.dispose();
+
+      if (videoPath != null && mounted) {
+        // Share the video
+        await VideoExportService.shareVideo(videoPath);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Video export failed')),
+        );
+      }
+    } catch (e) {
+      print('Video export error: $e');
+      progressNotifier.dispose();
+      if (mounted) {
+        Navigator.of(context).pop(); // Close progress dialog
+        setState(() => _isExportingVideo = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _exportMidi() async {
     try {

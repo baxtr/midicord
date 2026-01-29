@@ -57,5 +57,9 @@
 	<true/>
 	<key>UISupportsDocumentBrowser</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Midicord needs access to save exported videos to your photo library</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Midicord needs access to save exported videos to your photo library</string>
 </dict>
 </plist>
