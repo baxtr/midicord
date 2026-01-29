@@ -1,4 +1,4 @@
-package com.example.melodory
+package com.tunoodle.app
 
 import android.content.Intent
 import android.graphics.Bitmap

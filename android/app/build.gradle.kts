@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.melodory"
+    namespace = "com.tunoodle.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.melodory"
+        applicationId = "com.tunoodle.app"
         minSdk = flutter.minSdkVersion // Required for Android MIDI API
         targetSdk = 34
         versionCode = flutter.versionCode

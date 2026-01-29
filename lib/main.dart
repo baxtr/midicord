@@ -30,18 +30,18 @@ void main() {
     print('Stack: ${details.stack}');
   };
 
-  runApp(const MelodoryApp());
+  runApp(const TunoodleApp());
 }
 
-class MelodoryApp extends StatelessWidget {
-  const MelodoryApp({super.key});
+class TunoodleApp extends StatelessWidget {
+  const TunoodleApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => AppState(),
       child: MaterialApp(
-        title: 'Melodory',
+        title: 'Tunoodle',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.dark,

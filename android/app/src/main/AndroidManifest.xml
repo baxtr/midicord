@@ -13,7 +13,7 @@
     <uses-feature android:name="android.software.midi" android:required="false" />
 
     <application
-        android:label="melodory"
+        android:label="Tunoodle"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

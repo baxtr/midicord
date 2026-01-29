@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Melodory</string>
+	<string>Tunoodle</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,11 +46,11 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Melodory uses Bluetooth to connect to MIDI devices</string>
+	<string>Tunoodle uses Bluetooth to connect to MIDI devices</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Melodory uses Bluetooth to connect to MIDI devices</string>
+	<string>Tunoodle uses Bluetooth to connect to MIDI devices</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Melodory uses the local network to discover MIDI devices</string>
+	<string>Tunoodle uses the local network to discover MIDI devices</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
@@ -58,9 +58,9 @@
 	<key>UISupportsDocumentBrowser</key>
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Melodory needs access to save exported videos to your photo library</string>
+	<string>Tunoodle needs access to save exported videos to your photo library</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Melodory needs access to save exported videos to your photo library</string>
+	<string>Tunoodle needs access to save exported videos to your photo library</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

@@ -121,8 +121,8 @@ class AiService {
       headers: {
         'Authorization': 'Bearer $_apiKey',
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://melodory.app',
-        'X-Title': 'Melodory',
+        'HTTP-Referer': 'https://tunoodle.app',
+        'X-Title': 'Tunoodle',
       },
       body: jsonEncode({
         'model': _model,
@@ -219,8 +219,8 @@ Output all notes in the format: timestamp_ms, note_name, velocity''';
       headers: {
         'Authorization': 'Bearer $_apiKey',
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://melodory.app',
-        'X-Title': 'Melodory',
+        'HTTP-Referer': 'https://tunoodle.app',
+        'X-Title': 'Tunoodle',
       },
       body: jsonEncode({
         'model': _model,

@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Melodory',
+                        'Tunoodle',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 28,
@@ -519,7 +519,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.info_outline, color: Colors.white54),
               title: const Text(
-                'About Melodory',
+                'About Tunoodle',
                 style: TextStyle(color: Colors.white),
               ),
               subtitle: const Text(

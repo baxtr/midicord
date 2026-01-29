@@ -138,6 +138,6 @@ class MidiExportService {
         '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     final timeStr =
         '${date.hour.toString().padLeft(2, '0')}${date.minute.toString().padLeft(2, '0')}';
-    return 'Melodory_${dateStr}_$timeStr.mid';
+    return 'Tunoodle_${dateStr}_$timeStr.mid';
   }
 }

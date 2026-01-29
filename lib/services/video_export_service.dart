@@ -43,7 +43,7 @@ class VideoExportService {
     // Generate output path
     final docsDir = await getApplicationDocumentsDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final outputPath = '${docsDir.path}/Melodory_video_$timestamp.mp4';
+    final outputPath = '${docsDir.path}/Tunoodle_video_$timestamp.mp4';
 
     // Render audio
     String? audioPath;
