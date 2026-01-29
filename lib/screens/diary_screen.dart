@@ -48,104 +48,121 @@ class _DiaryScreenState extends State<DiaryScreen> {
         return Scaffold(
           backgroundColor: const Color(0xFF0f0f1a),
           body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  const Text(
-                    'Practice Diary',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${appState.melodies.length} recordings',
-                    style: const TextStyle(color: Colors.white54, fontSize: 14),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Practice calendar
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1a1a2e),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: PracticeCalendar(
-                      practiceByDay: appState.practiceByDay,
-                      selectedDate: _selectedDate,
-                      onDaySelected: (date) {
-                        setState(() => _selectedDate = date);
-                        _loadMelodiesForDate(date);
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Selected day header
-                  if (_selectedDate != null) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: CustomScrollView(
+              slivers: [
+                // Header
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          DateFormat('EEEE, MMMM d').format(_selectedDate!),
-                          style: const TextStyle(
+                        const Text(
+                          'Practice Diary',
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (_selectedDayMelodies.isNotEmpty)
-                          Text(
-                            '${_selectedDayMelodies.length} sessions',
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 14,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                        const SizedBox(height: 8),
+                        Text(
+                          '${appState.melodies.length} recordings',
+                          style: const TextStyle(color: Colors.white54, fontSize: 14),
+                        ),
+                        const SizedBox(height: 24),
 
-                  // Melodies list
-                  Expanded(
-                    child: _selectedDayMelodies.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.music_off,
-                                  color: Colors.white24,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'No recordings this day',
-                                  style: TextStyle(
-                                    color: Colors.white38,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _selectedDayMelodies.length,
-                            itemBuilder: (context, index) {
-                              final melody = _selectedDayMelodies[index];
-                              return _buildMelodyCard(melody, appState);
+                        // Practice calendar
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1a1a2e),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: PracticeCalendar(
+                            practiceByDay: appState.practiceByDay,
+                            selectedDate: _selectedDate,
+                            onDaySelected: (date) {
+                              setState(() => _selectedDate = date);
+                              _loadMelodiesForDate(date);
                             },
                           ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Selected day header
+                        if (_selectedDate != null)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                DateFormat('EEEE, MMMM d').format(_selectedDate!),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (_selectedDayMelodies.isNotEmpty)
+                                Text(
+                                  '${_selectedDayMelodies.length} sessions',
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+
+                // Melodies list
+                if (_selectedDayMelodies.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.music_off,
+                            color: Colors.white24,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No recordings this day',
+                            style: TextStyle(
+                              color: Colors.white38,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final melody = _selectedDayMelodies[index];
+                          return _buildMelodyCard(melody, appState);
+                        },
+                        childCount: _selectedDayMelodies.length,
+                      ),
+                    ),
+                  ),
+
+                // Bottom padding
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 20),
+                ),
+              ],
             ),
           ),
         );

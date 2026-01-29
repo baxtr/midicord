@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-class PracticeCalendar extends StatelessWidget {
+class PracticeCalendar extends StatefulWidget {
   final Map<DateTime, int> practiceByDay;
   final Function(DateTime) onDaySelected;
   final DateTime? selectedDate;
@@ -14,157 +14,205 @@ class PracticeCalendar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cellSize = (constraints.maxWidth - 40) / 53; // 52 weeks + padding
-        final now = DateTime.now();
-        final startDate = DateTime(now.year - 1, now.month, now.day);
+  State<PracticeCalendar> createState() => _PracticeCalendarState();
+}
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Month labels
-            _buildMonthLabels(startDate, cellSize),
-            const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Day labels
-                _buildDayLabels(cellSize),
-                const SizedBox(width: 4),
-                // Calendar grid
-                Expanded(
-                  child: _buildGrid(startDate, cellSize),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Legend
-            _buildLegend(),
-          ],
-        );
-      },
+class _PracticeCalendarState extends State<PracticeCalendar> {
+  late DateTime _currentMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentMonth = DateTime(
+      widget.selectedDate?.year ?? DateTime.now().year,
+      widget.selectedDate?.month ?? DateTime.now().month,
     );
   }
 
-  Widget _buildMonthLabels(DateTime startDate, double cellSize) {
-    final months = <Widget>[];
-    var currentMonth = -1;
-    var weekCount = 0;
-
-    for (var date = startDate;
-        date.isBefore(DateTime.now().add(const Duration(days: 1)));
-        date = date.add(const Duration(days: 7))) {
-      if (date.month != currentMonth) {
-        if (currentMonth != -1) {
-          months.add(SizedBox(width: weekCount * cellSize));
-        }
-        months.add(Text(
-          DateFormat('MMM').format(date),
-          style: const TextStyle(fontSize: 10, color: Colors.grey),
-        ));
-        currentMonth = date.month;
-        weekCount = 0;
-      }
-      weekCount++;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(left: 28),
-      child: Row(children: months),
-    );
+  void _previousMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
   }
 
-  Widget _buildDayLabels(double cellSize) {
-    const days = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
-    return Column(
-      children: days.map((d) => SizedBox(
-        height: cellSize,
-        child: Text(
-          d,
-          style: const TextStyle(fontSize: 9, color: Colors.grey),
-        ),
-      )).toList(),
-    );
-  }
-
-  Widget _buildGrid(DateTime startDate, double cellSize) {
-    final weeks = <Widget>[];
-    var currentDate = startDate;
-
-    // Adjust to start on Sunday
-    while (currentDate.weekday != DateTime.sunday) {
-      currentDate = currentDate.subtract(const Duration(days: 1));
-    }
-
+  void _nextMonth() {
     final now = DateTime.now();
+    final nextMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    if (nextMonth.isBefore(DateTime(now.year, now.month + 1))) {
+      setState(() {
+        _currentMonth = nextMonth;
+      });
+    }
+  }
 
-    while (currentDate.isBefore(now.add(const Duration(days: 1)))) {
-      final days = <Widget>[];
-
-      for (var i = 0; i < 7; i++) {
-        final date = currentDate.add(Duration(days: i));
-        final dayKey = DateTime(date.year, date.month, date.day);
-        final practiceMs = practiceByDay[dayKey] ?? 0;
-        final isSelected = selectedDate != null &&
-            dayKey.year == selectedDate!.year &&
-            dayKey.month == selectedDate!.month &&
-            dayKey.day == selectedDate!.day;
-
-        days.add(
-          GestureDetector(
-            onTap: () => onDaySelected(dayKey),
-            child: Container(
-              width: cellSize - 2,
-              height: cellSize - 2,
-              margin: const EdgeInsets.all(1),
-              decoration: BoxDecoration(
-                color: _getColorForPractice(practiceMs),
-                borderRadius: BorderRadius.circular(2),
-                border: isSelected
-                    ? Border.all(color: Colors.white, width: 2)
-                    : null,
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Month navigation
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chevron_left, color: Colors.white),
+              onPressed: _previousMonth,
+            ),
+            Text(
+              DateFormat('MMMM yyyy').format(_currentMonth),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-        );
+            IconButton(
+              icon: Icon(
+                Icons.chevron_right,
+                color: _canGoNext() ? Colors.white : Colors.white24,
+              ),
+              onPressed: _canGoNext() ? _nextMonth : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Weekday headers
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+              .map((d) => SizedBox(
+                    width: 40,
+                    child: Text(
+                      d,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 8),
+
+        // Calendar grid
+        _buildCalendarGrid(),
+
+        const SizedBox(height: 12),
+
+        // Legend
+        _buildLegend(),
+      ],
+    );
+  }
+
+  bool _canGoNext() {
+    final now = DateTime.now();
+    final nextMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    return nextMonth.isBefore(DateTime(now.year, now.month + 1));
+  }
+
+  Widget _buildCalendarGrid() {
+    final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
+    final lastDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+    final firstWeekday = firstDayOfMonth.weekday % 7; // Sunday = 0
+    final daysInMonth = lastDayOfMonth.day;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final rows = <Widget>[];
+    var dayCounter = 1 - firstWeekday;
+
+    while (dayCounter <= daysInMonth) {
+      final cells = <Widget>[];
+
+      for (var i = 0; i < 7; i++) {
+        if (dayCounter < 1 || dayCounter > daysInMonth) {
+          // Empty cell
+          cells.add(const SizedBox(width: 40, height: 40));
+        } else {
+          final date = DateTime(_currentMonth.year, _currentMonth.month, dayCounter);
+          final dayKey = DateTime(date.year, date.month, date.day);
+          final practiceMs = widget.practiceByDay[dayKey] ?? 0;
+          final isSelected = widget.selectedDate != null &&
+              dayKey.year == widget.selectedDate!.year &&
+              dayKey.month == widget.selectedDate!.month &&
+              dayKey.day == widget.selectedDate!.day;
+          final isToday = dayKey == today;
+          final isFuture = dayKey.isAfter(today);
+
+          cells.add(
+            GestureDetector(
+              onTap: isFuture ? null : () => widget.onDaySelected(dayKey),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isFuture
+                      ? Colors.transparent
+                      : _getColorForPractice(practiceMs),
+                  borderRadius: BorderRadius.circular(8),
+                  border: isSelected
+                      ? Border.all(color: const Color(0xFF4fc3f7), width: 2)
+                      : isToday
+                          ? Border.all(color: Colors.white54, width: 1)
+                          : null,
+                ),
+                child: Center(
+                  child: Text(
+                    dayCounter.toString(),
+                    style: TextStyle(
+                      color: isFuture ? Colors.white24 : Colors.white,
+                      fontSize: 14,
+                      fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        dayCounter++;
       }
 
-      weeks.add(Column(children: days));
-      currentDate = currentDate.add(const Duration(days: 7));
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: cells,
+          ),
+        ),
+      );
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      reverse: true, // Show recent dates first
-      child: Row(children: weeks),
-    );
+    return Column(children: rows);
   }
 
   Widget _buildLegend() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Text('Less', style: TextStyle(fontSize: 10, color: Colors.grey)),
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
         ...List.generate(5, (i) => Container(
-          width: 12,
-          height: 12,
-          margin: const EdgeInsets.symmetric(horizontal: 1),
+          width: 16,
+          height: 16,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
           decoration: BoxDecoration(
             color: _getLegendColor(i),
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(4),
           ),
         )),
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
         const Text('More', style: TextStyle(fontSize: 10, color: Colors.grey)),
       ],
     );
   }
 
   Color _getColorForPractice(int ms) {
-    if (ms == 0) return const Color(0xFF1a1a2e);
+    if (ms == 0) return const Color(0xFF252538);
     if (ms < 15 * 60 * 1000) return const Color(0xFF0e4429); // < 15 min
     if (ms < 45 * 60 * 1000) return const Color(0xFF006d32); // < 45 min
     if (ms < 90 * 60 * 1000) return const Color(0xFF26a641); // < 90 min
@@ -173,12 +221,12 @@ class PracticeCalendar extends StatelessWidget {
 
   Color _getLegendColor(int level) {
     switch (level) {
-      case 0: return const Color(0xFF1a1a2e);
+      case 0: return const Color(0xFF252538);
       case 1: return const Color(0xFF0e4429);
       case 2: return const Color(0xFF006d32);
       case 3: return const Color(0xFF26a641);
       case 4: return const Color(0xFF39d353);
-      default: return const Color(0xFF1a1a2e);
+      default: return const Color(0xFF252538);
     }
   }
 }
