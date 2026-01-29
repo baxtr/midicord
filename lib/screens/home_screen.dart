@@ -16,7 +16,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<MidiDevice> _devices = [];
   bool _scanning = false;
-  bool _monitorEnabled = false;
   StreamSubscription? _midiEventSubscription;
 
   @override
@@ -31,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _setupMidiMonitoring() {
     final appState = context.read<AppState>();
     _midiEventSubscription = appState.midiService.midiEventStream.listen((event) {
-      if (_monitorEnabled && appState.synthService.isLoaded) {
+      if (appState.monitorEnabled && appState.synthService.isLoaded) {
         if (event.isNoteOn) {
           appState.synthService.monitorNoteOn(event.data1, event.data2);
         } else if (event.isNoteOff) {
@@ -46,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _midiEventSubscription?.cancel();
     // Stop monitoring when leaving screen
     final appState = context.read<AppState>();
-    if (_monitorEnabled) {
+    if (appState.monitorEnabled) {
       appState.synthService.stopMonitoring();
     }
     super.dispose();
@@ -54,12 +53,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _toggleMonitor() async {
     final appState = context.read<AppState>();
-    if (_monitorEnabled) {
+    if (appState.monitorEnabled) {
       appState.synthService.stopMonitoring();
-      setState(() => _monitorEnabled = false);
+      await appState.setMonitorEnabled(false);
     } else {
       await appState.synthService.startMonitoring();
-      setState(() => _monitorEnabled = true);
+      await appState.setMonitorEnabled(true);
     }
   }
 
@@ -101,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Midicord',
+                        'Melodory',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 28,
@@ -200,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Icon(
                   Icons.volume_up,
-                  color: _monitorEnabled ? const Color(0xFF4fc3f7) : Colors.white54,
+                  color: appState.monitorEnabled ? const Color(0xFF4fc3f7) : Colors.white54,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -213,14 +212,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(color: Colors.white, fontSize: 14),
                       ),
                       Text(
-                        _monitorEnabled ? 'Playing through iPhone' : 'Hear your keyboard through iPhone speaker',
+                        appState.monitorEnabled ? 'Playing through iPhone' : 'Hear your keyboard through iPhone speaker',
                         style: const TextStyle(color: Colors.white38, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
                 Switch(
-                  value: _monitorEnabled,
+                  value: appState.monitorEnabled,
                   onChanged: (value) => _toggleMonitor(),
                   activeColor: const Color(0xFF4fc3f7),
                 ),
@@ -448,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.info_outline, color: Colors.white54),
               title: const Text(
-                'About Midicord',
+                'About Melodory',
                 style: TextStyle(color: Colors.white),
               ),
               subtitle: const Text(

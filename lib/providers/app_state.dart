@@ -17,6 +17,7 @@ class AppState extends ChangeNotifier {
   Melody? _currentRecording;
   bool _isRecording = false;
   bool _isLoading = false;
+  bool _monitorEnabled = false;
 
   List<Melody> get melodies => _melodies;
   Map<DateTime, int> get practiceByDay => _practiceByDay;
@@ -24,6 +25,7 @@ class AppState extends ChangeNotifier {
   bool get isRecording => _isRecording;
   bool get isLoading => _isLoading;
   bool get isConnected => midiService.isConnected;
+  bool get monitorEnabled => _monitorEnabled;
 
   AppState() {
     _init();
@@ -47,6 +49,7 @@ class AppState extends ChangeNotifier {
 
     // Load settings
     await _loadSilenceThreshold();
+    await _loadMonitorSetting();
 
     // Load melodies
     await loadMelodies();
@@ -119,6 +122,19 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final seconds = prefs.getInt('silence_threshold') ?? 3;
     midiService.setSilenceThreshold(seconds);
+  }
+
+  Future<void> _loadMonitorSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    _monitorEnabled = prefs.getBool('monitor_enabled') ?? false;
+    notifyListeners();
+  }
+
+  Future<void> setMonitorEnabled(bool enabled) async {
+    _monitorEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('monitor_enabled', enabled);
+    notifyListeners();
   }
 
   @override

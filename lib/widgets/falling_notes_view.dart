@@ -48,8 +48,10 @@ class _FallingNotesViewState extends State<FallingNotesView> {
     final playheadY = widget.playheadPosition! * widget.pixelsPerMs;
     final maxScroll = _scrollController.position.maxScrollExtent;
 
-    // Keep playhead near the bottom of the viewport (where the piano is)
-    final targetScroll = playheadY - _viewportHeight * 0.7;
+    // With reverse scroll, scrollPosition directly corresponds to the y-offset from bottom
+    // So to have the note at playheadPosition at the blue line (bottom of viewport),
+    // we scroll to playheadY
+    final targetScroll = playheadY;
 
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(targetScroll.clamp(0, maxScroll));
@@ -80,28 +82,51 @@ class _FallingNotesViewState extends State<FallingNotesView> {
 
         return Column(
           children: [
-            // Falling notes area
+            // Falling notes area with fixed strike line
             Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                reverse: true, // Notes fall down, so scroll from bottom
-                child: SizedBox(
-                  width: constraints.maxWidth,
-                  height: totalHeight,
-                  child: CustomPaint(
-                    painter: _FallingNotesPainter(
-                      events: noteOnEvents,
-                      allEvents: widget.events,
-                      minNote: minNote,
-                      maxNote: maxNote,
-                      keyWidth: keyWidth,
-                      pixelsPerMs: widget.pixelsPerMs,
-                      playheadPosition: widget.playheadPosition,
-                      totalHeight: totalHeight,
-                      viewportHeight: _viewportHeight,
+              child: Stack(
+                children: [
+                  SingleChildScrollView(
+                    controller: _scrollController,
+                    reverse: true, // Notes fall down, so scroll from bottom
+                    child: SizedBox(
+                      width: constraints.maxWidth,
+                      height: totalHeight,
+                      child: CustomPaint(
+                        painter: _FallingNotesPainter(
+                          events: noteOnEvents,
+                          allEvents: widget.events,
+                          minNote: minNote,
+                          maxNote: maxNote,
+                          keyWidth: keyWidth,
+                          pixelsPerMs: widget.pixelsPerMs,
+                          playheadPosition: widget.playheadPosition,
+                          totalHeight: totalHeight,
+                          viewportHeight: _viewportHeight,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  // Fixed blue strike line right above the keys
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4fc3f7),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4fc3f7).withOpacity(0.5),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             // Piano keyboard
@@ -183,9 +208,6 @@ class _FallingNotesPainter extends CustomPainter {
       ..color = Colors.white.withOpacity(0.05)
       ..strokeWidth = 1;
     final blackKeyBgPaint = Paint()..color = const Color(0xFF0a0a12);
-    final playheadPaint = Paint()
-      ..color = const Color(0xFF4fc3f7)
-      ..strokeWidth = 3;
 
     // Background
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
@@ -262,22 +284,6 @@ class _FallingNotesPainter extends CustomPainter {
       canvas.drawRRect(noteRect, borderPaint);
     }
 
-    // Draw playhead
-    if (playheadPosition != null) {
-      final y = size.height - (playheadPosition! * pixelsPerMs);
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        playheadPaint,
-      );
-
-      // Add glow effect
-      final glowPaint = Paint()
-        ..color = const Color(0xFF4fc3f7).withOpacity(0.3)
-        ..strokeWidth = 8
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), glowPaint);
-    }
   }
 
   bool _isBlackKey(int note) {

@@ -14,7 +14,7 @@ class StorageService {
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'midicord.db');
+    final path = join(dbPath, 'melodory.db');
 
     return await openDatabase(
       path,

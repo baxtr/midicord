@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/melody.dart';
 
 class MidiService {
@@ -81,6 +82,9 @@ class MidiService {
       _connectedDevice = device;
       _connectionController.add(device);
 
+      // Keep screen awake while connected to prevent recording interruption
+      WakelockPlus.enable();
+
       // Start listening to MIDI data
       _midiSubscription?.cancel();
       _midiSubscription = _midiCommand.onMidiDataReceived?.listen(_handleMidiData);
@@ -105,6 +109,9 @@ class MidiService {
     _midiSubscription?.cancel();
     _midiSubscription = null;
     stopRecording();
+
+    // Allow screen to sleep again
+    WakelockPlus.disable();
   }
 
   void _handleMidiData(MidiPacket packet) {
@@ -225,5 +232,6 @@ class MidiService {
     _midiEventController.close();
     _recordingStateController.close();
     _recordingCompleteController.close();
+    WakelockPlus.disable();
   }
 }

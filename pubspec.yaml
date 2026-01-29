@@ -1,5 +1,5 @@
-name: midicord
-description: A friction-free MIDI recorder with AI melody expansion
+name: melodory
+description: A melody diary - capture and remember your musical ideas
 
 publish_to: 'none'
 
@@ -38,6 +38,9 @@ dependencies:
 
   # Sharing
   share_plus: ^7.2.1
+
+  # Keep screen awake during recording
+  wakelock_plus: ^1.1.4
 
 dev_dependencies:
   flutter_test:

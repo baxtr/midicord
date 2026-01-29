@@ -30,18 +30,18 @@ void main() {
     print('Stack: ${details.stack}');
   };
 
-  runApp(const MidicordApp());
+  runApp(const MelodoryApp());
 }
 
-class MidicordApp extends StatelessWidget {
-  const MidicordApp({super.key});
+class MelodoryApp extends StatelessWidget {
+  const MelodoryApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => AppState(),
       child: MaterialApp(
-        title: 'Midicord',
+        title: 'Melodory',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.dark,
