@@ -190,11 +190,53 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
-          // Monitor toggle when connected
+          // Options when connected
           if (appState.isConnected) ...[
             const SizedBox(height: 16),
             const Divider(color: Colors.white10),
             const SizedBox(height: 8),
+            // Auto-connect toggle
+            Row(
+              children: [
+                Icon(
+                  Icons.star,
+                  color: appState.midiService.isDeviceRemembered(appState.midiService.connectedDevice!)
+                      ? const Color(0xFF4fc3f7)
+                      : Colors.white54,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Auto-connect',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                      const Text(
+                        'Remember this device',
+                        style: TextStyle(color: Colors.white38, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: appState.midiService.isDeviceRemembered(appState.midiService.connectedDevice!),
+                  onChanged: (value) async {
+                    if (value) {
+                      await appState.midiService.rememberDevice(appState.midiService.connectedDevice!);
+                    } else {
+                      await appState.midiService.forgetDevice(appState.midiService.connectedDevice!);
+                    }
+                    setState(() {});
+                  },
+                  activeColor: const Color(0xFF4fc3f7),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Speaker monitor toggle
             Row(
               children: [
                 Icon(
@@ -230,26 +272,38 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             const Divider(color: Colors.white10),
             const SizedBox(height: 8),
-            ..._devices.map((device) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.usb, color: Colors.white54),
-                  title: Text(
-                    device.name,
-                    style: const TextStyle(color: Colors.white),
-                    overflow: TextOverflow.ellipsis,
+            ..._devices.map((device) {
+              final isRemembered = appState.midiService.isDeviceRemembered(device);
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  isRemembered ? Icons.star : Icons.usb,
+                  color: isRemembered ? const Color(0xFF4fc3f7) : Colors.white54,
+                ),
+                title: Text(
+                  device.name,
+                  style: const TextStyle(color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: isRemembered
+                    ? const Text(
+                        'Auto-connect enabled',
+                        style: TextStyle(color: Color(0xFF4fc3f7), fontSize: 12),
+                      )
+                    : null,
+                trailing: SizedBox(
+                  width: 80,
+                  child: TextButton(
+                    onPressed: () async {
+                      print('Connecting to: ${device.name} (${device.id})');
+                      await appState.midiService.connect(device);
+                      setState(() {});
+                    },
+                    child: const Text('Connect'),
                   ),
-                  trailing: SizedBox(
-                    width: 80,
-                    child: TextButton(
-                      onPressed: () async {
-                        print('Connecting to: ${device.name} (${device.id})');
-                        await appState.midiService.connect(device);
-                        setState(() {});
-                      },
-                      child: const Text('Connect'),
-                    ),
-                  ),
-                )),
+                ),
+              );
+            }),
           ],
           if (!appState.isConnected && _devices.isEmpty && !_scanning)
             const Padding(
@@ -443,6 +497,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: const TextStyle(color: Colors.white38),
               ),
               onTap: () => _showSilenceThresholdDialog(context, appState),
+            ),
+            ListTile(
+              leading: const Icon(Icons.star_border, color: Colors.white54),
+              title: const Text(
+                'Forget all MIDI devices',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: Text(
+                '${appState.midiService.rememberedDeviceIds.length} device(s) remembered',
+                style: const TextStyle(color: Colors.white38),
+              ),
+              onTap: () async {
+                await appState.midiService.forgetAllDevices();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('All devices forgotten')),
+                );
+              },
             ),
             ListTile(
               leading: const Icon(Icons.info_outline, color: Colors.white54),

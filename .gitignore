@@ -75,3 +75,6 @@ app.*.symbols
 
 # API keys
 secrets.dart
+
+# Large assets (soundfonts)
+assets/*.sf2

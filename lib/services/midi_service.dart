@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_midi_command/flutter_midi_command.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/melody.dart';
 
@@ -14,6 +15,10 @@ class MidiService {
   bool _isRecording = false;
   DateTime? _recordingStartTime;
   List<MidiEvent> _recordedEvents = [];
+
+  // Remembered devices for auto-connect
+  Set<String> _rememberedDeviceIds = {};
+  static const String _rememberedDevicesKey = 'remembered_midi_devices';
 
   // Stream controllers for UI updates
   final _connectionController = StreamController<MidiDevice?>.broadcast();
@@ -59,15 +64,81 @@ class MidiService {
     _init();
   }
 
-  void _init() {
+  void _init() async {
+    // Load remembered devices
+    await _loadRememberedDevices();
+
     // Listen for device connections/disconnections
-    _setupSubscription = _midiCommand.onMidiSetupChanged?.listen((event) {
+    _setupSubscription = _midiCommand.onMidiSetupChanged?.listen((event) async {
       if (event == 'deviceDisconnected') {
         _connectedDevice = null;
         _connectionController.add(null);
         stopRecording();
+      } else if (event == 'deviceFound' || event == 'deviceAppeared') {
+        // Try to auto-connect to remembered devices
+        await _tryAutoConnect();
       }
     });
+
+    // Initial auto-connect attempt
+    await _tryAutoConnect();
+  }
+
+  /// Load remembered device IDs from storage
+  Future<void> _loadRememberedDevices() async {
+    final prefs = await SharedPreferences.getInstance();
+    final deviceIds = prefs.getStringList(_rememberedDevicesKey) ?? [];
+    _rememberedDeviceIds = deviceIds.toSet();
+    print('Loaded ${_rememberedDeviceIds.length} remembered MIDI devices');
+  }
+
+  /// Save remembered device IDs to storage
+  Future<void> _saveRememberedDevices() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_rememberedDevicesKey, _rememberedDeviceIds.toList());
+  }
+
+  /// Remember a device for auto-connect
+  Future<void> rememberDevice(MidiDevice device) async {
+    _rememberedDeviceIds.add(device.id);
+    await _saveRememberedDevices();
+    print('Remembered MIDI device: ${device.name} (${device.id})');
+  }
+
+  /// Forget a device (disable auto-connect)
+  Future<void> forgetDevice(MidiDevice device) async {
+    _rememberedDeviceIds.remove(device.id);
+    await _saveRememberedDevices();
+    print('Forgot MIDI device: ${device.name} (${device.id})');
+  }
+
+  /// Forget all remembered devices
+  Future<void> forgetAllDevices() async {
+    _rememberedDeviceIds.clear();
+    await _saveRememberedDevices();
+    print('Forgot all MIDI devices');
+  }
+
+  /// Check if a device is remembered
+  bool isDeviceRemembered(MidiDevice device) {
+    return _rememberedDeviceIds.contains(device.id);
+  }
+
+  /// Get all remembered device IDs
+  Set<String> get rememberedDeviceIds => Set.from(_rememberedDeviceIds);
+
+  /// Try to auto-connect to any available remembered device
+  Future<void> _tryAutoConnect() async {
+    if (_connectedDevice != null) return; // Already connected
+
+    final devices = await getDevices();
+    for (final device in devices) {
+      if (_rememberedDeviceIds.contains(device.id)) {
+        print('Auto-connecting to remembered device: ${device.name}');
+        final success = await connect(device, autoRemember: false);
+        if (success) break;
+      }
+    }
   }
 
   /// Get list of available MIDI devices
@@ -76,11 +147,17 @@ class MidiService {
   }
 
   /// Connect to a MIDI device
-  Future<bool> connect(MidiDevice device) async {
+  /// If autoRemember is true (default), the device will be remembered for auto-connect
+  Future<bool> connect(MidiDevice device, {bool autoRemember = true}) async {
     try {
       await _midiCommand.connectToDevice(device);
       _connectedDevice = device;
       _connectionController.add(device);
+
+      // Remember this device for future auto-connect
+      if (autoRemember) {
+        await rememberDevice(device);
+      }
 
       // Keep screen awake while connected to prevent recording interruption
       WakelockPlus.enable();
