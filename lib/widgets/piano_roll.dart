@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/melody.dart';
 
-class PianoRoll extends StatelessWidget {
+class PianoRoll extends StatefulWidget {
   final List<MidiEvent> events;
   final int? playheadPosition; // current playback position in ms
   final (int, int)? selectedRange; // AB loop selection
@@ -18,8 +18,47 @@ class PianoRoll extends StatelessWidget {
   });
 
   @override
+  State<PianoRoll> createState() => _PianoRollState();
+}
+
+class _PianoRollState extends State<PianoRoll> {
+  final ScrollController _scrollController = ScrollController();
+  double _viewportWidth = 0;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(PianoRoll oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Auto-scroll when playhead position changes
+    if (widget.playheadPosition != oldWidget.playheadPosition &&
+        widget.playheadPosition != null &&
+        _scrollController.hasClients) {
+      _scrollToPlayhead();
+    }
+  }
+
+  void _scrollToPlayhead() {
+    final playheadX = widget.playheadPosition! * widget.pixelsPerMs;
+    final currentScroll = _scrollController.offset;
+    final viewportCenter = _viewportWidth / 2;
+
+    // Keep playhead roughly in the center-left of the viewport
+    final targetScroll = playheadX - viewportCenter * 0.3;
+
+    // Only scroll if playhead is outside visible area or too far ahead
+    if (playheadX < currentScroll || playheadX > currentScroll + _viewportWidth * 0.7) {
+      _scrollController.jumpTo(targetScroll.clamp(0, _scrollController.position.maxScrollExtent));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (events.isEmpty) {
+    if (widget.events.isEmpty) {
       return const Center(
         child: Text(
           'No notes recorded',
@@ -28,7 +67,7 @@ class PianoRoll extends StatelessWidget {
       );
     }
 
-    final noteOnEvents = events.where((e) => e.isNoteOn).toList();
+    final noteOnEvents = widget.events.where((e) => e.isNoteOn).toList();
     if (noteOnEvents.isEmpty) {
       return const Center(child: Text('No notes'));
     }
@@ -40,14 +79,16 @@ class PianoRoll extends StatelessWidget {
     final noteRange = maxNote - minNote + 1;
 
     // Calculate duration
-    final maxTimestamp = events.last.timestamp;
-    final totalWidth = maxTimestamp * pixelsPerMs;
+    final maxTimestamp = widget.events.last.timestamp;
+    final totalWidth = maxTimestamp * widget.pixelsPerMs;
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        _viewportWidth = constraints.maxWidth;
         final noteHeight = constraints.maxHeight / noteRange;
 
         return SingleChildScrollView(
+          controller: _scrollController,
           scrollDirection: Axis.horizontal,
           child: SizedBox(
             width: totalWidth.clamp(constraints.maxWidth, double.infinity),
@@ -58,9 +99,9 @@ class PianoRoll extends StatelessWidget {
                 minNote: minNote,
                 maxNote: maxNote,
                 noteHeight: noteHeight,
-                pixelsPerMs: pixelsPerMs,
-                playheadPosition: playheadPosition,
-                selectedRange: selectedRange,
+                pixelsPerMs: widget.pixelsPerMs,
+                playheadPosition: widget.playheadPosition,
+                selectedRange: widget.selectedRange,
               ),
             ),
           ),
@@ -95,7 +136,6 @@ class _PianoRollPainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = Colors.white.withOpacity(0.1)
       ..strokeWidth = 1;
-    final notePaint = Paint()..color = const Color(0xFF4fc3f7);
     final blackKeyPaint = Paint()..color = const Color(0xFF0f0f1a);
     final playheadPaint = Paint()
       ..color = Colors.red

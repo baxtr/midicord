@@ -98,8 +98,8 @@ class AppState extends ChangeNotifier {
     return midiService.stopRecording();
   }
 
-  void setApiKey(String key) {
-    aiService.setApiKey(key);
+  Future<void> setApiKey(String key) async {
+    await aiService.setApiKey(key);
   }
 
   @override

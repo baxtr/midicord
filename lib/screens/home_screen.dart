@@ -476,8 +476,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              appState.setApiKey(controller.text);
+            onPressed: () async {
+              await appState.setApiKey(controller.text);
               Navigator.pop(context);
               Navigator.pop(context); // Close settings too
               ScaffoldMessenger.of(context).showSnackBar(

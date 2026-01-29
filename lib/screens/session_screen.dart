@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/melody.dart';
 import '../providers/app_state.dart';
 import '../widgets/piano_roll.dart';
+import '../widgets/falling_notes_view.dart';
 import 'ai_expand_screen.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -25,6 +27,7 @@ class _SessionScreenState extends State<SessionScreen> {
   (int, int)? _loopRange;
   bool _isLooping = false;
   bool _useSpeaker = false; // false = MIDI output, true = speaker
+  bool _useFallingNotes = false; // false = piano roll, true = falling notes
 
   final TextEditingController _notesController = TextEditingController();
 
@@ -33,6 +36,25 @@ class _SessionScreenState extends State<SessionScreen> {
     super.initState();
     _melody = widget.melody;
     _notesController.text = _melody.notes ?? '';
+    _loadOutputPreference();
+  }
+
+  Future<void> _loadOutputPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _useSpeaker = prefs.getBool('use_speaker_output') ?? false;
+      _useFallingNotes = prefs.getBool('use_falling_notes_view') ?? false;
+    });
+  }
+
+  Future<void> _saveOutputPreference(bool useSpeaker) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('use_speaker_output', useSpeaker);
+  }
+
+  Future<void> _saveViewPreference(bool useFallingNotes) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('use_falling_notes_view', useFallingNotes);
   }
 
   @override
@@ -229,7 +251,63 @@ class _SessionScreenState extends State<SessionScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Piano roll
+            // View toggle
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Text(
+                    'View:',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _useFallingNotes = false);
+                      _saveViewPreference(false);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: !_useFallingNotes ? const Color(0xFF4fc3f7) : const Color(0xFF1a1a2e),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Roll',
+                        style: TextStyle(
+                          color: !_useFallingNotes ? Colors.black : Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _useFallingNotes = true);
+                      _saveViewPreference(true);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _useFallingNotes ? const Color(0xFF4fc3f7) : const Color(0xFF1a1a2e),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Falling',
+                        style: TextStyle(
+                          color: _useFallingNotes ? Colors.black : Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Piano roll or Falling notes view
             Expanded(
               flex: 3,
               child: Container(
@@ -239,11 +317,17 @@ class _SessionScreenState extends State<SessionScreen> {
                   border: Border.all(color: Colors.white10),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: PianoRoll(
-                  events: _melody.events,
-                  playheadPosition: _playheadPosition,
-                  selectedRange: _loopRange,
-                ),
+                child: _useFallingNotes
+                    ? FallingNotesView(
+                        events: _melody.events,
+                        playheadPosition: _playheadPosition,
+                        durationMs: _melody.durationMs,
+                      )
+                    : PianoRoll(
+                        events: _melody.events,
+                        playheadPosition: _playheadPosition,
+                        selectedRange: _loopRange,
+                      ),
               ),
             ),
             const SizedBox(height: 16),
@@ -361,7 +445,9 @@ class _SessionScreenState extends State<SessionScreen> {
                       color: _useSpeaker ? const Color(0xFF4fc3f7) : Colors.white,
                     ),
                     onPressed: () {
-                      setState(() => _useSpeaker = !_useSpeaker);
+                      final newValue = !_useSpeaker;
+                      setState(() => _useSpeaker = newValue);
+                      _saveOutputPreference(newValue);
                     },
                     iconSize: 28,
                     tooltip: _useSpeaker ? 'Speaker (tap for MIDI)' : 'MIDI (tap for Speaker)',

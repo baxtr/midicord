@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/melody.dart';
 
 enum ExpansionType {
@@ -7,15 +8,28 @@ enum ExpansionType {
   continue_,
   variation,
   accompaniment,
+  fullSong,
 }
 
 class AiService {
   final String _baseUrl = 'https://openrouter.ai/api/v1';
   String? _apiKey;
-  String _model = 'anthropic/claude-3.5-sonnet'; // Default model
+  String _model = 'google/gemini-3-flash-preview'; // Default model
+  static const String _apiKeyPref = 'openrouter_api_key';
 
-  void setApiKey(String key) {
+  AiService() {
+    _loadApiKey();
+  }
+
+  Future<void> _loadApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    _apiKey = prefs.getString(_apiKeyPref);
+  }
+
+  Future<void> setApiKey(String key) async {
     _apiKey = key;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_apiKeyPref, key);
   }
 
   void setModel(String model) {
@@ -173,6 +187,22 @@ Output with the same starting timestamp.''';
 Create a simple left-hand accompaniment pattern for this melody.
 Use bass notes and chord patterns appropriate for the implied harmony.
 Notes should be in a lower register (C2-C4 range).''';
+
+      case ExpansionType.fullSong:
+        return '''$midiText
+
+Transform this melody into a complete, professional-quality piano piece:
+1. First, analyze the melody and fix any notes that sound "wrong" or out of key - correct them to fit the implied harmony
+2. Add an intro (4-8 bars) that sets up the melody
+3. Present the main melody with proper accompaniment
+4. Add a contrasting B section or development
+5. Return to the main theme
+6. Add an outro/ending
+
+Make it sound polished and complete like a real piano composition.
+Keep the core melody recognizable but enhance it professionally.
+Include both hands - melody in the right hand range (C4-C6) and accompaniment/bass in the left hand range (C2-C4).
+Output all notes in the format: timestamp_ms, note_name, velocity''';
     }
   }
 

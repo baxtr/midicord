@@ -257,6 +257,8 @@ class _AiExpandScreenState extends State<AiExpandScreen> {
         return 'Variation';
       case ExpansionType.accompaniment:
         return 'Accompaniment';
+      case ExpansionType.fullSong:
+        return 'Full Song';
     }
   }
 
@@ -270,6 +272,8 @@ class _AiExpandScreenState extends State<AiExpandScreen> {
         return 'Create a variation with ornaments and modifications';
       case ExpansionType.accompaniment:
         return 'Generate a left-hand accompaniment pattern';
+      case ExpansionType.fullSong:
+        return 'Create a complete piano piece - fixes wrong notes, adds intro, development & ending';
     }
   }
 
@@ -320,11 +324,32 @@ class _AiExpandScreenState extends State<AiExpandScreen> {
     }
   }
 
-  void _playExpanded() {
-    // TODO: Implement playback through MIDI service
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Playback coming soon')),
-    );
+  void _playExpanded() async {
+    final appState = context.read<AppState>();
+
+    if (!appState.synthService.isLoaded) {
+      await appState.synthService.init();
+    }
+
+    // Stop any currently playing notes
+    appState.synthService.stopAllNotes();
+
+    if (_expandedEvents.isEmpty) return;
+
+    // Normalize timestamps to start from 0
+    final startOffset = _expandedEvents.first.timestamp;
+
+    // Schedule all note events with timers
+    for (final event in _expandedEvents) {
+      final adjustedTime = event.timestamp - startOffset;
+      Future.delayed(Duration(milliseconds: adjustedTime), () {
+        if (event.isNoteOn) {
+          appState.synthService.playNote(event.data1, event.data2);
+        } else if (event.isNoteOff) {
+          appState.synthService.stopNote(event.data1);
+        }
+      });
+    }
   }
 
   Future<void> _saveAsNew(AppState appState) async {
